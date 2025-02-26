@@ -66,8 +66,8 @@ jobs:
           # 添加可执行权限
           chmod +x "mihomo-linux-${ARCH}"
           
-          # UPX压缩（直接覆盖原文件）
-          upx --lzma "mihomo-linux-${ARCH}"
+          # UPX压缩
+          upx --lzma --best "mihomo-linux-${ARCH}"
           
           # 打包
           tar czvf artifacts/mihomo-linux-${ARCH}-${{ env.latest_version }}.tar.gz "mihomo-linux-${ARCH}"
@@ -83,7 +83,7 @@ jobs:
       with:
         tag_name: ${{ env.latest_version }}
         name: "Compressed ${{ env.latest_version }}"
-        body: "Pre-compressed binaries using UPX --lzma --ultra-brute"
+        body: "Pre-compressed binaries using UPX --lzma --best"
         draft: false
         prerelease: false
         files: |

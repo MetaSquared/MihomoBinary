@@ -77,7 +77,6 @@ jobs:
         done
 
     - name: Create new release
-      if: env.update_available == 'true'
       id: create_release
       uses: actions/create-release@v1
       with:
@@ -88,6 +87,7 @@ jobs:
         prerelease: false
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
 
     - name: Upload arm64 asset
       if: env.update_available == 'true'

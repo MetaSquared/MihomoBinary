@@ -72,9 +72,6 @@ jobs:
           # 打包
           tar czvf artifacts/mihomo-linux-${ARCH}-${{ steps.get_version.outputs.latest_version }}.tar.gz mihomo-linux-${ARCH}
           rm mihomo*
-          
-          # 清理临时文件
-          rm mihomo-linux-${ARCH}.gz mihomo-linux-${ARCH}
         done
 
     - name: Create new release

@@ -8,6 +8,29 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - arch: armv7
+            goarch: arm
+            goarm: 7
+            tags: "with_gvisor"
+            suffix: "gvisor"
+          - arch: armv7
+            goarch: arm
+            goarm: 7
+            tags: ""
+            suffix: ""
+          - arch: arm64
+            goarch: arm64
+            goarm: ""
+            tags: "with_gvisor"
+            suffix: "gvisor"
+          - arch: arm64
+            goarch: arm64
+            goarm: ""
+            tags: ""
+            suffix: ""
     steps:
     - name: Check current repo
       uses: actions/checkout@v4
@@ -56,29 +79,6 @@ jobs:
         mv mihomo-${META_VERSION#v} source
 
     - name: Build binaries
-      strategy:
-        matrix:
-          include:
-            - arch: armv7
-              goarch: arm
-              goarm: 7
-              tags: "with_gvisor"
-              suffix: "gvisor"
-            - arch: armv7
-              goarch: arm
-              goarm: 7
-              tags: ""
-              suffix: ""
-            - arch: arm64
-              goarch: arm64
-              goarm: ""
-              tags: "with_gvisor"
-              suffix: "gvisor"
-            - arch: arm64
-              goarch: arm64
-              goarm: ""
-              tags: ""
-              suffix: ""
       env:
         GOOS: linux
         GOARCH: ${{ matrix.goarch }}
@@ -97,7 +97,7 @@ jobs:
           -o ../$FILENAME
         
         cd ..
-        upx --lzma $FILENAME
+        upx --lzma --best $FILENAME
 
     - name: Create release
       uses: softprops/action-gh-release@v1

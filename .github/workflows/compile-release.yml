@@ -15,22 +15,22 @@ jobs:
             goarch: arm
             goarm: 7
             tags: "with_gvisor"
-            suffix: "gvisor"
+            variant: "with-gvisor"
           - arch: armv7
             goarch: arm
             goarm: 7
             tags: ""
-            suffix: ""
+            variant: "without-gvisor"
           - arch: arm64
             goarch: arm64
             goarm: ""
             tags: "with_gvisor"
-            suffix: "gvisor"
+            variant: "with-gvisor"
           - arch: arm64
             goarch: arm64
             goarm: ""
             tags: ""
-            suffix: ""
+            variant: "without-gvisor"
     steps:
     - name: Check current repo
       uses: actions/checkout@v4
@@ -78,16 +78,17 @@ jobs:
         tar -xzf ${{ env.META_VERSION }}.tar.gz
         mv mihomo-${META_VERSION#v} source
 
-    - name: Build binaries
+    - name: Build and package
       env:
         GOOS: linux
         GOARCH: ${{ matrix.goarch }}
         GOARM: ${{ matrix.goarm }}
       run: |
+        # 构建二进制文件
         cd source
         BUILDTIME=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
-        FILENAME="mihomo-linux-${{ matrix.arch }}"
-        [[ -n "${{ matrix.suffix }}" ]] && FILENAME="${FILENAME}-${{ matrix.suffix }}"        
+        FILENAME="mihomo-${{ matrix.variant }}-linux-${{ matrix.arch }}"
+        
         CGO_ENABLED=0 go build \
           -tags "${{ matrix.tags }}" \
           -trimpath \
@@ -96,8 +97,13 @@ jobs:
                     -w -s -buildid=linux-${{ matrix.arch }}" \
           -o ../$FILENAME
         
+        # UPX压缩
         cd ..
         upx --lzma --best $FILENAME
+
+        # 打包为tar.gz
+        tar -czvf $FILENAME.tar.gz $FILENAME
+        rm $FILENAME  # 删除原始二进制文件，只保留压缩包
 
     - name: Create release
       uses: softprops/action-gh-release@v1
@@ -106,7 +112,6 @@ jobs:
         name: "Build for ${{ env.META_VERSION }}"
         body: "Automated build of MetaCubeX/mihomo ${{ env.META_VERSION }}"
         files: |
-          mihomo-linux-*
-        overwrite: true
+          mihomo-*-linux-*.tar.gz
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

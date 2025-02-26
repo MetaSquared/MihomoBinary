@@ -49,7 +49,7 @@ jobs:
       run: |
         # 安装依赖
         sudo apt-get update
-        sudo apt-get install -y upx gunzip
+        sudo apt-get install -y upx gzip
 
         # 创建工作目录
         mkdir -p artifacts
@@ -61,7 +61,7 @@ jobs:
           wget -O mihomo-linux-${ARCH}-${{ steps.get_version.outputs.latest_version }}.gz "$URL"
           
           # 解压
-          gunzip mihomo-linux-${ARCH}-${{ steps.get_version.outputs.latest_version }}.gz
+          gzip -d mihomo-linux-${ARCH}-${{ steps.get_version.outputs.latest_version }}.gz
           
           # UPX压缩
           upx --lzma mihomo-linux-${ARCH}

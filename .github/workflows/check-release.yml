@@ -22,7 +22,7 @@ jobs:
       id: get_version
       run: |
         LATEST_VERSION=$(curl -s https://api.github.com/repos/MetaCubeX/mihomo/releases/latest | jq -r '.tag_name')
-        echo "latest_version=$LATEST_VERSION" >> $GITHUB_OUTPUT
+        echo "latest_version=$LATEST_VERSION" >> $GITHUB_ENV
 
     - name: Read current version
       id: current_version
@@ -32,46 +32,45 @@ jobs:
         else
           CURRENT_VERSION="v0.0.0"
         fi
-        echo "current_version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+        echo "current_version=$CURRENT_VERSION" >> $GITHUB_ENV
 
     - name: Compare versions
       id: compare_versions
       run: |
-        if [[ "${{ steps.get_version.outputs.latest_version }}" > "${{ steps.current_version.outputs.current_version }}" ]]; then
-          echo "update_available=true" >> $GITHUB_OUTPUT
-          echo "new_version=${{ steps.get_version.outputs.latest_version }}" >> $GITHUB_OUTPUT
+        if [[ "${{ env.latest_version }}" > "${{ env.current_version }}" ]]; then
+          echo "update_available=true" >> $GITHUB_ENV
+          echo "new_version=${{ env.latest_version }}" >> $GITHUB_ENV
         else
-          echo "update_available=false" >> $GITHUB_OUTPUT
+          echo "update_available=false" >> $GITHUB_ENV
         fi
 
     - name: Process new release
-      if: steps.compare_versions.outputs.update_available == 'true'
+      if: env.update_available == 'true'
       run: |
         # 安装依赖
         sudo apt-get update
-        sudo apt-get install -y upx gzip
+        sudo apt-get install -y upx
 
         # 创建工作目录
         mkdir -p artifacts
 
         # 下载并处理每个架构
         for ARCH in arm64 armv7; do
-          # 下载文件
-          URL="https://github.com/MetaCubeX/mihomo/releases/download/${{ steps.get_version.outputs.latest_version }}/mihomo-linux-${ARCH}-${{ steps.get_version.outputs.latest_version }}.gz"
-          wget -O mihomo-linux-${ARCH}.gz "$URL"
+          # 下载文件并重命名为 mihomo-linux-${ARCH}.gz
+          URL="https://github.com/MetaCubeX/mihomo/releases/download/${{ env.latest_version }}/mihomo-linux-${ARCH}-${{ env.latest_version }}.gz"
+          wget -O "mihomo-linux-${ARCH}.gz" "$URL"
           
-          # 解压
-          gzip -d mihomo-linux-${ARCH}.gz
-
-          # 赋权
-          chmod +x mihomo-linux-${ARCH}
+          # 解压文件
+          gzip -d "mihomo-linux-${ARCH}.gz"  # 解压后会生成 mihomo-linux-${ARCH}
           
-          # UPX压缩
-          upx --lzma mihomo-linux-${ARCH}
+          # UPX压缩（直接覆盖原文件）
+          upx --lzma "mihomo-linux-${ARCH}"
           
-          # 打包
-          tar czvf artifacts/mihomo-linux-${ARCH}-${{ steps.get_version.outputs.latest_version }}.tar.gz mihomo-linux-${ARCH}
-          rm mihomo*
+          # 打包（不使用 upx 前缀）
+          tar czvf artifacts/mihomo-linux-${ARCH}-${{ env.latest_version }}.tar.gz "mihomo-linux-${ARCH}"
+          
+          # 清理临时文件
+          rm "mihomo-linux-${ARCH}"
         done
 
     - name: Create new release
@@ -80,14 +79,14 @@ jobs:
       uses: actions/create-release@v1
       with:
         tag_name: ${{ env.latest_version }}
-        release_name: "UPX Compressed ${{ env.latest_version }}"
+        release_name: "Compressed ${{ env.latest_version }}"
         body: "Pre-compressed binaries using UPX --lzma --ultra-brute"
         draft: false
         prerelease: false
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-    - name: Upload assets
+    - name: Upload arm64 asset
       if: env.update_available == 'true'
       uses: actions/upload-release-asset@v1
       with:

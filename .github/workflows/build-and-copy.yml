@@ -1,4 +1,4 @@
-name: Auto Build And Copy Mihomo
+name: Auto Build Mihomo
 
 on:
   schedule:
@@ -10,15 +10,15 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        include:
+        arch_pair:
           - arch: armv7
             goarch: arm
             goarm: 7
-            bin_dir: MerlinClash2/bin32
+            bin_dir: bin32
           - arch: arm64
             goarch: arm64
             goarm: ""
-            bin_dir: MerlinClash2/bin64
+            bin_dir: bin64
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
@@ -68,11 +68,11 @@ jobs:
         tar -xzf ${{ env.META_VERSION }}.tar.gz
         mv mihomo-${META_VERSION#v} source
 
-    - name: Build binary
+    - name: Build ${{ matrix.arch_pair.arch }}
       env:
         GOOS: linux
-        GOARCH: ${{ matrix.goarch }}
-        GOARM: ${{ matrix.goarm }}
+        GOARCH: ${{ matrix.arch_pair.goarch }}
+        GOARM: ${{ matrix.arch_pair.goarm }}
       run: |
         cd source
         BUILDTIME=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
@@ -81,29 +81,27 @@ jobs:
           -trimpath \
           -ldflags "-X 'github.com/metacubex/mihomo/constant.Version=${{ env.META_VERSION }}' \
                     -X 'github.com/metacubex/mihomo/constant.BuildTime=$BUILDTIME' \
-                    -w -s -buildid=linux-${{ matrix.arch }}" \
+                    -w -s -buildid=linux-${{ matrix.arch_pair.arch }}" \
           -o ../clash
         
         cd ..
         upx --lzma --best clash
 
-    - name: Prepare directories
-      run: |
-        mkdir -p ${{ matrix.bin_dir }}
-        echo ${{ env.META_VERSION }} > version.txt
+        # 创建目标目录并移动文件
+        mkdir -p MerlinClash2/${{ matrix.arch_pair.bin_dir }}
+        mv clash MerlinClash2/${{ matrix.arch_pair.bin_dir }}/
+        chmod +x MerlinClash2/${{ matrix.arch_pair.bin_dir }}/clash
 
-    - name: Move binary
+    - name: Update version file
       run: |
-        mv clash ${{ matrix.bin_dir }}/
-        chmod +x ${{ matrix.bin_dir }}/clash
+        echo ${{ env.META_VERSION }} > MerlinClash2/version.txt
 
     - name: Commit changes
       run: |
         git config --global user.name "GitHub Actions"
         git config --global user.email "actions@github.com"
         git add MerlinClash2/
-        git add version.txt
-        git commit -m "Update to ${{ env.META_VERSION }} for ${{ matrix.arch }}"
+        git commit -m "Update to ${{ env.META_VERSION }}"
         git push
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

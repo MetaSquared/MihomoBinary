@@ -99,7 +99,7 @@ jobs:
         
         # UPX压缩
         cd ..
-        upx --lzma --best $FILENAME
+        upx --lzma --brute $FILENAME
 
         # 打包为tar.gz
         tar -czvf $FILENAME.tar.gz $FILENAME

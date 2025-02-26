@@ -62,6 +62,9 @@ jobs:
           
           # 解压
           gzip -d mihomo-linux-${ARCH}.gz
+
+          # 赋权
+          chmod +x mihomo-linux-${ARCH}
           
           # UPX压缩
           upx --lzma mihomo-linux-${ARCH}

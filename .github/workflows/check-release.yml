@@ -85,7 +85,7 @@ jobs:
 
     - name: Upload assets
       if: steps.compare_versions.outputs.update_available == 'true'
-      uses: actions/upload-release-asset@v2
+      uses: actions/upload-release-asset@v1
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
         asset_path: ./artifacts/mihomo-upx-arm64.tar.gz
@@ -94,7 +94,7 @@ jobs:
 
     - name: Upload armv7 asset
       if: steps.compare_versions.outputs.update_available == 'true'
-      uses: actions/upload-release-asset@v2
+      uses: actions/upload-release-asset@v1
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
         asset_path: ./artifacts/mihomo-upx-armv7.tar.gz

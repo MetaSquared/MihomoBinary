@@ -1,0 +1,112 @@
+name: Check and Update Release
+
+on:
+  schedule:
+    - cron: '0 */6 * * *' # 每6小时检查一次
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  check-and-release:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Get latest release version
+      id: get_version
+      run: |
+        LATEST_VERSION=$(curl -s https://api.github.com/repos/MetaCubeX/mihomo/releases/latest | jq -r '.tag_name')
+        echo "latest_version=$LATEST_VERSION" >> $GITHUB_OUTPUT
+
+    - name: Read current version
+      id: current_version
+      run: |
+        if [ -f version.txt ]; then
+          CURRENT_VERSION=$(cat version.txt)
+        else
+          CURRENT_VERSION="v0.0.0"
+        fi
+        echo "current_version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+
+    - name: Compare versions
+      id: compare_versions
+      run: |
+        if [[ "${{ steps.get_version.outputs.latest_version }}" > "${{ steps.current_version.outputs.current_version }}" ]]; then
+          echo "update_available=true" >> $GITHUB_OUTPUT
+          echo "new_version=${{ steps.get_version.outputs.latest_version }}" >> $GITHUB_OUTPUT
+        else
+          echo "update_available=false" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Process new release
+      if: steps.compare_versions.outputs.update_available == 'true'
+      run: |
+        # 安装依赖
+        sudo apt-get update
+        sudo apt-get install -y upx
+
+        # 创建工作目录
+        mkdir -p artifacts
+
+        # 下载并处理每个架构
+        for ARCH in arm64 armv7; do
+          # 下载文件
+          URL="https://github.com/MetaCubeX/mihomo/releases/download/${{ steps.get_version.outputs.latest_version }}/mihomo-linux-${ARCH}-${{ steps.get_version.outputs.latest_version }}.gz"
+          wget -O mihomo.gz "$URL"
+          
+          # 解压
+          gunzip mihomo.gz
+          
+          # UPX压缩
+          upx --lzma -o mihomo-upx
+          
+          # 打包
+          tar czvf artifacts/mihomo-upx-${ARCH}.tar.gz mihomo-upx
+          rm mihomo*
+        done
+
+    - name: Create new release
+      if: steps.compare_versions.outputs.update_available == 'true'
+      uses: actions/create-release@v1
+      with:
+        tag_name: ${{ steps.get_version.outputs.latest_version }}
+        release_name: "UPX Compressed ${{ steps.get_version.outputs.latest_version }}"
+        body: "Pre-compressed binaries using UPX --lzma --ultra-brute"
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Upload assets
+      if: steps.compare_versions.outputs.update_available == 'true'
+      uses: actions/upload-release-asset@v2
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./artifacts/mihomo-upx-arm64.tar.gz
+        asset_name: mihomo-upx-arm64.tar.gz
+        asset_content_type: application/gzip
+
+    - name: Upload armv7 asset
+      if: steps.compare_versions.outputs.update_available == 'true'
+      uses: actions/upload-release-asset@v2
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./artifacts/mihomo-upx-armv7.tar.gz
+        asset_name: mihomo-upx-armv7.tar.gz
+        asset_content_type: application/gzip
+
+    - name: Update version file
+      if: steps.compare_versions.outputs.update_available == 'true'
+      run: |
+        echo "${{ steps.get_version.outputs.latest_version }}" > version.txt
+        git config --global user.name "GitHub Actions"
+        git config --global user.email "actions@github.com"
+        git add version.txt
+        git commit -m "Update to ${{ steps.get_version.outputs.latest_version }}"
+        git push

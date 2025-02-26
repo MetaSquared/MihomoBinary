@@ -64,7 +64,7 @@ jobs:
           gunzip mihomo.gz
           
           # UPX压缩
-          upx --lzma -o mihomo-upx
+          upx --lzma mihomo-upx
           
           # 打包
           tar czvf artifacts/mihomo-upx-${ARCH}.tar.gz mihomo-upx

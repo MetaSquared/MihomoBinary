@@ -1,4 +1,4 @@
-name: Auto Build Mihomo
+name: Auto Build And Copy Mihomo
 
 on:
   schedule:

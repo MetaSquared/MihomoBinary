@@ -1,0 +1,109 @@
+name: Auto Build Mihomo
+
+on:
+  schedule:
+    - cron: '0 0 * * *'  # 每天UTC午夜检查
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - arch: armv7
+            goarch: arm
+            goarm: 7
+            bin_dir: MerlinClash2/bin32
+          - arch: arm64
+            goarch: arm64
+            goarm: ""
+            bin_dir: MerlinClash2/bin64
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Get latest MetaCubeX release
+      id: meta-release
+      run: |
+        LATEST_TAG=$(curl -sL https://api.github.com/repos/MetaCubeX/mihomo/releases/latest | jq -r '.tag_name')
+        echo "META_VERSION=${LATEST_TAG}" >> $GITHUB_ENV
+
+    - name: Get latest self commit
+      id: self-commit
+      run: |
+        CURRENT_COMMIT=$(git log -1 --pretty=format:'%H' -- MerlinClash2/)
+        echo "CURRENT_COMMIT=${CURRENT_COMMIT}" >> $GITHUB_ENV
+
+    - name: Compare versions
+      id: compare
+      run: |
+        if git show $CURRENT_COMMIT:MerlinClash2/version.txt | grep -q "${{ env.META_VERSION }}"; then
+          echo "No new version available"
+          echo "SKIP=true" >> $GITHUB_ENV
+        else
+          echo "New version detected"
+          echo "SKIP=false" >> $GITHUB_ENV
+        fi
+
+    - name: Exit if no update
+      if: env.SKIP == 'true'
+      run: exit 0
+
+    - name: Setup Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.21'
+
+    - name: Install UPX
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y upx
+
+    - name: Download source
+      run: |
+        wget https://github.com/MetaCubeX/mihomo/archive/refs/tags/${{ env.META_VERSION }}.tar.gz
+        tar -xzf ${{ env.META_VERSION }}.tar.gz
+        mv mihomo-${META_VERSION#v} source
+
+    - name: Build binary
+      env:
+        GOOS: linux
+        GOARCH: ${{ matrix.goarch }}
+        GOARM: ${{ matrix.goarm }}
+      run: |
+        cd source
+        BUILDTIME=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
+        
+        CGO_ENABLED=0 go build \
+          -trimpath \
+          -ldflags "-X 'github.com/metacubex/mihomo/constant.Version=${{ env.META_VERSION }}' \
+                    -X 'github.com/metacubex/mihomo/constant.BuildTime=$BUILDTIME' \
+                    -w -s -buildid=linux-${{ matrix.arch }}" \
+          -o ../clash
+        
+        cd ..
+        upx --lzma --best clash
+
+    - name: Prepare directories
+      run: |
+        mkdir -p ${{ matrix.bin_dir }}
+        echo ${{ env.META_VERSION }} > version.txt
+
+    - name: Move binary
+      run: |
+        mv clash ${{ matrix.bin_dir }}/
+        chmod +x ${{ matrix.bin_dir }}/clash
+
+    - name: Commit changes
+      run: |
+        git config --global user.name "GitHub Actions"
+        git config --global user.email "actions@github.com"
+        git add MerlinClash2/
+        git add version.txt
+        git commit -m "Update to ${{ env.META_VERSION }} for ${{ matrix.arch }}"
+        git push
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
